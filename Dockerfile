@@ -1,5 +1,9 @@
-FROM ubuntu:16.04
+FROM ubuntu:16.04 as builder
 MAINTAINER Toshiyuki HIRANO <hiracchi@gmail.com>
+
+ARG FFMPEG_VER=n3.4.1
+ARG FFMPEG_PREFIX=/opt/ffmpeg
+
 RUN set -x \
   && apt-get update \
   && apt-get -y install \
@@ -8,6 +12,12 @@ RUN set -x \
     build-essential \
     cmake \
     git \
+    mercurial \
+    pkg-config \
+    texinfo \
+    wget \
+    nasm \
+    yasm \
     libass-dev \
     libfreetype6-dev \
     libsdl2-dev \
@@ -19,12 +29,7 @@ RUN set -x \
     libxcb1-dev \
     libxcb-shm0-dev \
     libxcb-xfixes0-dev \
-    mercurial \
-    pkg-config \
-    texinfo \
-    wget \
     zlib1g-dev \
-    yasm \
     libx264-dev \
     libx265-dev \
     libvpx-dev \
@@ -37,36 +42,12 @@ RUN set -x \
 
 RUN set -x \
   && cd ~/ffmpeg_sources \
-  && wget http://www.nasm.us/pub/nasm/releasebuilds/2.13.01/nasm-2.13.01.tar.bz2 \
-  && tar xjvf nasm-2.13.01.tar.bz2 \
-  && cd nasm-2.13.01 \
-  && ./autogen.sh \
-  && PATH="$HOME/bin:$PATH" ./configure --prefix="$HOME/ffmpeg_build" --bindir="$HOME/bin" \
-  && make \
-  && make install \
-  && make clean
-
-RUN set -x \
-  && cd ~/ffmpeg_sources \
-  && if cd x265 2> /dev/null; then hg pull && hg update; else hg clone https://bitbucket.org/multicoreware/x265; fi \
-  && cd x265/build/linux \
-  && PATH="$HOME/bin:$PATH" cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="$HOME/ffmpeg_build" -DENABLE_SHARED:bool=off ../../source \
-  && PATH="$HOME/bin:$PATH" make \
-  && make install \
-  && make clean
-
-RUN set -x \
-  && cd ~/ffmpeg_sources \
-  && wget -O ffmpeg-snapshot.tar.bz2 http://ffmpeg.org/releases/ffmpeg-snapshot.tar.bz2 \
-  && tar xjvf ffmpeg-snapshot.tar.bz2 \
-  && cd ffmpeg \
-  && PATH="$HOME/bin:$PATH" PKG_CONFIG_PATH="$HOME/ffmpeg_build/lib/pkgconfig" ./configure \
-    --prefix="$HOME/ffmpeg_build" \
-    --pkg-config-flags="--static" \
-    --extra-cflags="-I$HOME/ffmpeg_build/include" \
-    --extra-ldflags="-L$HOME/ffmpeg_build/lib" \
-    --extra-libs="-lpthread -lm" \
-    --bindir="$HOME/bin" \
+  && wget "https://github.com/FFmpeg/FFmpeg/archive/${FFMPEG_VER}.tar.gz" \
+  && tar xzvf ${FFMPEG_VER}.tar.gz \
+  && cd FFmpeg-${FFMPEG_VER} \
+  && PATH="${FFMPEG_PREFIX}/bin:$PATH" PKG_CONFIG_PATH="${FFMPEG_PREFIX}/lib/pkgconfig" ./configure \
+    --prefix="${FFMPEG_PREFIX}" \
+    --enable-static --disable-shared --disable-debug \
     --enable-gpl \
     --enable-libass \
     --enable-libfdk-aac \
@@ -79,6 +60,37 @@ RUN set -x \
     --enable-libx264 \
     --enable-libx265 \
     --enable-nonfree \
-  && PATH="$HOME/bin:$PATH" make \
+  && PATH="${FFMPEG_PREFIX}/bin:$PATH" make \
   && make install \
   && make clean
+
+
+# ==============================================================================
+# Runtime image
+# ==============================================================================
+FROM ubuntu:16.04
+
+RUN set -x \
+  && apt-get update \
+  && apt-get -y install \
+    vainfo i965-va-driver \
+    libass5 \
+    libfreetype6 \
+    libsdl2-2.0-0 \
+    libtheora0 \
+    libva1 libva-drm1 libva-x11-1 \
+    libvdpau1 \
+    libvorbis0a libvorbisenc2 libvorbisfile3 \
+    libxcb1 libxcb-shape0 libxcb-shm0 libxcb-xfixes0 \
+    zlib1g \
+    libx264-148 \
+    libx265-79 \
+    libvpx3 \
+    libfdk-aac0 \
+    libmp3lame0 \
+    libopus0 \
+    libxv1 \
+  && apt-get clean && apt-get autoclean \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY  --from=builder /opt/ffmpeg /opt/ffmpeg

@@ -7,5 +7,5 @@ build:
 
 run:
 	docker run -it --rm \
-          "hiracchi/${PACKAGE}" /bin/bash
-
+		--device=/dev/dri:/dev/dri \
+		"hiracchi/${PACKAGE}" /bin/bash
