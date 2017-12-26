@@ -94,3 +94,12 @@ RUN set -x \
   && rm -rf /var/lib/apt/lists/*
 
 COPY  --from=builder /opt/ffmpeg /opt/ffmpeg
+
+# ref. https://www.jifu-labo.net/2017/02/h264_encode/
+COPY files/ts2mp4_hwenc.sh /usr/local/bin/
+COPY files/ts2enc.ffpreset /usr/local/etc/
+RUN set -x \
+  && chmod +x /usr/local/bin/ts2mp4_hwenc.sh \
+  && rm -rf /tmp/*
+
+# ENTRYPOINT ["/docker-entrypoint.sh"]
